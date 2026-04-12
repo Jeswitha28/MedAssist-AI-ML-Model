@@ -1,0 +1,49 @@
+medicine_name,active_ingredient,safe_min,safe_max,interacts_with,used_for
+Paracetamol,Paracetamol,500,1000,None,fever pain viral_fever
+Dolo,Paracetamol,650,650,None,fever pain viral_fever
+Crocin,Paracetamol,500,650,None,fever pain viral_fever
+Azithromycin,Azithromycin,250,500,None,pneumonia respiratory_infection bacterial_infection
+Amoxicillin,Amoxicillin,250,500,None,pneumonia respiratory_infection bacterial_infection
+Augmentin,Amoxicillin Clavulanate,375,625,None,bacterial_infection respiratory_infection
+Ibuprofen,Ibuprofen,200,800,Warfarin,pain inflammation fever
+Aspirin,Aspirin,75,325,Warfarin,pain heart blood_thinner
+Warfarin,Warfarin,1,10,Aspirin,blood_thinner
+Cetirizine,Cetirizine,5,10,None,allergy cold
+Levocetirizine,Levocetirizine,5,5,None,allergy cold
+Metformin,Metformin,500,2000,None,diabetes
+Glycomet,Metformin,500,1000,None,diabetes
+Telma,Telmisartan,20,80,None,bp hypertension
+Amlong,Amlodipine,2.5,10,None,bp hypertension
+Thyronorm,Levothyroxine,25,150,None,thyroid
+Thyrox,Levothyroxine,25,150,None,thyroid
+Pantocid,Pantoprazole,20,40,None,acidity gastric
+Pantocid DSR,Pantoprazole Domperidone,40,40,None,acidity gastric
+Pan,Pantoprazole,20,40,None,acidity gastric
+Ecosprin,Aspirin,75,150,Warfarin,blood_thinner heart
+Ecosprin Gold,Ecosprin Gold,20,20,None,blood_thinner cholesterol heart
+Rosuvas,Rosuvastatin,5,40,None,cholesterol heart
+Atorva,Atorvastatin,10,80,None,cholesterol heart
+Vymada,Sacubitril Valsartan,50,200,None,heart_failure bp
+Concor,Bisoprolol,2.5,10,None,bp heart_failure
+Dytor,Torasemide,5,20,None,fluid_retention congestion heart_failure
+Lasix,Furosemide,20,80,None,fluid_retention congestion
+Jardiance,Empagliflozin,10,25,None,diabetes heart_failure
+Istamet,Metformin Sitagliptin,500,1000,None,diabetes
+Janumet,Metformin Sitagliptin,500,1000,None,diabetes
+Shelcal XT,Calcium VitaminD B12,1,2,None,calcium vitamin_deficiency
+Shelcal,Calcium VitaminD,1,2,None,calcium vitamin_deficiency
+Febuget,Febuxostat,40,80,None,uric_acid gout
+Petril,Clonazepam,0.25,2,None,sleep anxiety
+Clonotril,Clonazepam,0.25,2,None,sleep anxiety
+Rantac,Ranitidine,150,300,None,acidity gastric
+Omez,Omeprazole,20,40,None,acidity gastric
+Montek,Montelukast,10,10,None,allergy asthma
+Montair,Montelukast,10,10,None,allergy asthma
+Allegra,Fexofenadine,120,180,None,allergy
+Taxim,Cefixime,200,400,None,bacterial_infection respiratory_infection
+Cefixime,Cefixime,200,400,None,bacterial_infection respiratory_infection
+Azee,Azithromycin,250,500,None,pneumonia respiratory_infection bacterial_infection
+Calpol,Paracetamol,500,650,None,fever pain
+Zifi,Cefixime,200,400,None,bacterial_infection
+Nicip,Nimesulide,100,100,None,pain fever inflammation
+PCM,Paracetamol,500,1000,None,fever pain

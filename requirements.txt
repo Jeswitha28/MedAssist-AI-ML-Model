@@ -1,0 +1,6 @@
+pandas
+numpy
+easyocr
+opencv-python
+pillow
+requests
