@@ -1,237 +1,261 @@
 import os
-import json
 import re
+import json
 import requests
 import pandas as pd
+from difflib import SequenceMatcher
 
-MED_DB_PATH = "data/medicine_db.csv"
-CACHE_PATH = "data/medicine_cache.json"
+# =========================
+# PATH SETUP
+# =========================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))   # src/
+PROJECT_ROOT = os.path.dirname(BASE_DIR)                # MedAssist/
 
-RXNORM_APPROX_URL = "https://rxnav.nlm.nih.gov/REST/approximateTerm.json"
-RXNORM_RXCUI_URL = "https://rxnav.nlm.nih.gov/REST/rxcui"
-RXNORM_PROPERTIES_URL = "https://rxnav.nlm.nih.gov/REST/rxcui/{rxcui}/allProperties.json"
+MED_DB_PATH = os.path.join(PROJECT_ROOT, "data", "medicine_db.csv")
+CACHE_PATH = os.path.join(PROJECT_ROOT, "data", "medicine_cache.json")
 
-# -----------------------------
-# Load local medicine DB
-# -----------------------------
-def load_local_db():
-    if not os.path.exists(MED_DB_PATH):
-        return pd.DataFrame(columns=[
-            "medicine_name", "active_ingredient", "safe_min", "safe_max", "interacts_with", "used_for"
-        ])
-    return pd.read_csv(MED_DB_PATH)
+RXNORM_URL = "https://rxnav.nlm.nih.gov/REST/approximateTerm.json"
 
-# -----------------------------
-# Cache helpers
-# -----------------------------
+# =========================
+# LOAD LOCAL DB
+# =========================
+med_db = pd.read_csv(MED_DB_PATH)
+
+# =========================
+# CACHE HELPERS
+# =========================
 def load_cache():
-    if not os.path.exists(CACHE_PATH):
-        return {}
-    try:
-        with open(CACHE_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {}
+    if os.path.exists(CACHE_PATH):
+        try:
+            with open(CACHE_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
 
 def save_cache(cache):
     with open(CACHE_PATH, "w", encoding="utf-8") as f:
-        json.dump(cache, f, indent=2, ensure_ascii=False)
+        json.dump(cache, f, indent=2)
 
-# -----------------------------
-# Normalize medicine token
-# -----------------------------
-def normalize_medicine_name(name):
-    if not name:
-        return ""
+medicine_cache = load_cache()
 
-    name = name.lower().strip()
+# =========================
+# TEXT NORMALIZATION
+# =========================
+def normalize_text(s):
+    s = str(s).lower().strip()
+    s = s.replace("|", "l")
+    s = s.replace("0", "o")
+    s = s.replace("1", "l")
+    s = s.replace("5", "s")
+    s = re.sub(r'[^a-z0-9\s\-]', ' ', s)
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
 
-    # remove common prescription prefixes
-    name = re.sub(r'^\s*(t|tab|tablet|cap|capsule|inj|syrup|syp|drop|drops)\.?\s+', '', name)
+def contains_letters(s):
+    return bool(re.search(r'[a-z]', s))
 
-    # keep letters, digits, spaces, dots
-    name = re.sub(r'[^a-z0-9\.\s]', ' ', name)
-    name = re.sub(r'\s+', ' ', name).strip()
+# =========================
+# VALIDATE CANDIDATE
+# =========================
+def is_valid_lookup_candidate(candidate):
+    cleaned = normalize_text(candidate)
 
-    return name
+    if not cleaned:
+        return False
+    if not contains_letters(cleaned):
+        return False
+    if len(cleaned) < 5:
+        return False
 
-# -----------------------------
-# Local DB exact / contains lookup
-# -----------------------------
-def search_local_db(raw_name):
-    df = load_local_db()
-    if df.empty:
-        return None
+    tokens = cleaned.split()
 
-    query = normalize_medicine_name(raw_name)
+    if len(tokens) > 4:
+        return False
 
-    # 1. Exact normalized match
-    for _, row in df.iterrows():
-        med = str(row["medicine_name"]).strip()
-        if normalize_medicine_name(med) == query:
-            return {
-                "source": "LOCAL_DB",
-                "query": raw_name,
-                "matched_name": med,
-                "active_ingredient": row["active_ingredient"],
-                "safe_min": float(row["safe_min"]),
-                "safe_max": float(row["safe_max"]),
-                "interacts_with": row["interacts_with"],
-                "used_for": row["used_for"]
-            }
+    if re.fullmatch(r'[\d\s\-\/]+', cleaned):
+        return False
 
-    # 2. Contains match (useful for "ecosprin gold 20")
-    for _, row in df.iterrows():
-        med = str(row["medicine_name"]).strip()
-        med_norm = normalize_medicine_name(med)
-
-        if med_norm in query or query in med_norm:
-            return {
-                "source": "LOCAL_DB",
-                "query": raw_name,
-                "matched_name": med,
-                "active_ingredient": row["active_ingredient"],
-                "safe_min": float(row["safe_min"]),
-                "safe_max": float(row["safe_max"]),
-                "interacts_with": row["interacts_with"],
-                "used_for": row["used_for"]
-            }
-
-    return None
-
-# -----------------------------
-# Cache lookup
-# -----------------------------
-def search_cache(raw_name):
-    cache = load_cache()
-    query = normalize_medicine_name(raw_name)
-
-    if query in cache:
-        data = cache[query]
-        data["source"] = "CACHE"
-        data["query"] = raw_name
-        return data
-
-    return None
-
-# -----------------------------
-# Save to cache
-# -----------------------------
-def add_to_cache(raw_name, result):
-    cache = load_cache()
-    query = normalize_medicine_name(raw_name)
-
-    cache[query] = {
-        "matched_name": result.get("matched_name", raw_name),
-        "active_ingredient": result.get("active_ingredient", "Unknown"),
-        "safe_min": result.get("safe_min", None),
-        "safe_max": result.get("safe_max", None),
-        "interacts_with": result.get("interacts_with", "Unknown"),
-        "used_for": result.get("used_for", "Unknown"),
-        "rxnorm_rxcui": result.get("rxnorm_rxcui", None),
-        "confidence": result.get("confidence", None)
+    junk_words = {
+        "tab", "tablet", "cap", "capsule", "syrup", "inj", "drop",
+        "morning", "night", "before", "after", "food", "daily",
+        "od", "bd", "tid", "hs", "sos", "rx", "take"
     }
 
-    save_cache(cache)
+    if len(tokens) == 1 and tokens[0] in junk_words:
+        return False
 
-# -----------------------------
-# RxNorm approximate lookup
-# -----------------------------
-def search_rxnorm(raw_name):
-    query = normalize_medicine_name(raw_name)
-    if not query:
-        return None
+    if all(len(re.sub(r'[^a-z]', '', t)) < 2 for t in tokens):
+        return False
+
+    return True
+
+# =========================
+# SAFE RANGE FORMATTER
+# =========================
+def format_safe_range(row):
+    safe_min = row.get("safe_dose_min_mg", None)
+    safe_max = row.get("safe_dose_max_mg", None)
 
     try:
-        # approximate match endpoint
-        resp = requests.get(
-            RXNORM_APPROX_URL,
-            params={"term": query, "maxEntries": 3},
-            timeout=8
-        )
-        resp.raise_for_status()
-        data = resp.json()
+        if pd.notna(safe_min) and pd.notna(safe_max):
+            return f"{float(safe_min)}-{float(safe_max)} mg"
+    except:
+        pass
 
-        candidates = data.get("approximateGroup", {}).get("candidate", [])
+    return "Unknown"
+
+# =========================
+# LOCAL DB LOOKUP (STRICT)
+# =========================
+def lookup_local_db(candidate):
+    candidate_norm = normalize_text(candidate)
+
+    best_row = None
+    best_score = 0.0
+
+    for _, row in med_db.iterrows():
+        med_name = str(row["medicine_name"]).strip()
+        med_norm = normalize_text(med_name)
+
+        if candidate_norm == med_norm:
+            return {
+                "medicine_name": med_name,
+                "confidence": 1.0,
+                "source": "LOCAL_DB_EXACT",
+                "safe_range": format_safe_range(row)
+            }
+
+        if med_norm in candidate_norm or candidate_norm in med_norm:
+            score = 0.92
+        else:
+            score = SequenceMatcher(None, candidate_norm, med_norm).ratio()
+
+        if score > best_score:
+            best_score = score
+            best_row = row
+
+    if best_row is not None and best_score >= 0.84:
+        return {
+            "medicine_name": str(best_row["medicine_name"]).strip(),
+            "confidence": float(round(best_score, 3)),
+            "source": "LOCAL_DB_FUZZY",
+            "safe_range": format_safe_range(best_row)
+        }
+
+    return None
+
+# =========================
+# CACHE LOOKUP (STRICT)
+# =========================
+def lookup_cache(candidate):
+    candidate_norm = normalize_text(candidate)
+
+    if candidate_norm in medicine_cache:
+        item = medicine_cache[candidate_norm]
+
+        try:
+            conf = float(item.get("confidence", 0))
+        except:
+            conf = 0.0
+
+        if conf >= 0.90:
+            return {
+                "medicine_name": item.get("medicine_name"),
+                "confidence": conf,
+                "source": "CACHE",
+                "safe_range": item.get("safe_range", "Unknown")
+            }
+
+    return None
+
+# =========================
+# RXNORM LOOKUP (OPTIONAL FALLBACK)
+# =========================
+def lookup_rxnorm(candidate):
+    try:
+        params = {"term": candidate, "maxEntries": 3}
+
+        response = requests.get(RXNORM_URL, params=params, timeout=5)
+        if response.status_code != 200:
+            return None
+
+        data = response.json()
+        group = data.get("approximateGroup", {})
+        candidates = group.get("candidate", [])
+
         if not candidates:
             return None
 
         best = candidates[0]
-        rxcui = best.get("rxcui")
-        score = best.get("score")
+        score = best.get("score", "0")
 
-        matched_name = query.title()
+        try:
+            score = float(score) / 100.0
+        except:
+            score = 0.0
 
-        # Try to fetch concept name via /rxcui/<id>/allProperties.json
-        active_ingredient = "Unknown"
+        if score < 0.92:
+            return None
 
-        if rxcui:
-            try:
-                prop_resp = requests.get(
-                    RXNORM_PROPERTIES_URL.format(rxcui=rxcui),
-                    params={"prop": "names"},
-                    timeout=8
-                )
-                if prop_resp.status_code == 200:
-                    prop_data = prop_resp.json()
-                    props = prop_data.get("propConceptGroup", {}).get("propConcept", [])
-                    if props:
-                        matched_name = props[0].get("propValue", matched_name)
-            except:
-                pass
-
-        result = {
-            "source": "RXNORM_API",
-            "query": raw_name,
-            "matched_name": matched_name,
-            "active_ingredient": active_ingredient,
-            "safe_min": None,
-            "safe_max": None,
-            "interacts_with": "Unknown",
-            "used_for": "Unknown",
-            "rxnorm_rxcui": rxcui,
-            "confidence": score
+        return {
+            "medicine_name": candidate.title(),
+            "confidence": float(round(score, 3)),
+            "source": "RXNORM_APPROX",
+            "safe_range": "Unknown"
         }
 
-        return result
-
-    except Exception as e:
-        print(f"[RxNorm Lookup Failed] {raw_name}: {e}")
+    except Exception:
         return None
 
-# -----------------------------
-# Main public lookup function
-# -----------------------------
-def lookup_medicine(raw_name):
-    # 1. local DB
-    local = search_local_db(raw_name)
-    if local:
-        return local
+# =========================
+# CACHE SAVE (STRICT)
+# =========================
+def cache_result(original_candidate, result):
+    if not result:
+        return
 
-    # 2. cache
-    cached = search_cache(raw_name)
-    if cached:
-        return cached
+    if not is_valid_lookup_candidate(original_candidate):
+        return
 
-    # 3. RxNorm fallback
-    rx = search_rxnorm(raw_name)
-    if rx:
-        add_to_cache(raw_name, rx)
-        return rx
+    try:
+        conf = float(result.get("confidence", 0))
+    except:
+        conf = 0.0
 
-    # 4. unknown fallback
-    unknown = {
-        "source": "UNKNOWN",
-        "query": raw_name,
-        "matched_name": raw_name,
-        "active_ingredient": "Unknown",
-        "safe_min": None,
-        "safe_max": None,
-        "interacts_with": "Unknown",
-        "used_for": "Unknown",
-        "rxnorm_rxcui": None,
-        "confidence": None
+    if conf < 0.90:
+        return
+
+    candidate_norm = normalize_text(original_candidate)
+
+    medicine_cache[candidate_norm] = {
+        "medicine_name": result["medicine_name"],
+        "confidence": float(conf),
+        "source": result["source"],
+        "safe_range": result.get("safe_range", "Unknown")
     }
 
-    add_to_cache(raw_name, unknown)
-    return unknown
+    save_cache(medicine_cache)
+
+# =========================
+# MAIN LOOKUP FUNCTION
+# =========================
+def lookup_medicine(candidate):
+    if not is_valid_lookup_candidate(candidate):
+        return None
+
+    local_result = lookup_local_db(candidate)
+    if local_result:
+        cache_result(candidate, local_result)
+        return local_result
+
+    cache_hit = lookup_cache(candidate)
+    if cache_hit:
+        return cache_hit
+
+    rxnorm_result = lookup_rxnorm(candidate)
+    if rxnorm_result:
+        cache_result(candidate, rxnorm_result)
+        return rxnorm_result
+
+    return None

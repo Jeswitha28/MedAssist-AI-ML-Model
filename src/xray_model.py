@@ -4,9 +4,14 @@ import torch.nn as nn
 from torchvision import transforms, models
 from PIL import Image
 
-MODEL_PATH = "models/best_xray_model.pth"
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# =========================
+# PATH SETUP
+# =========================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))   # src/
+PROJECT_ROOT = os.path.dirname(BASE_DIR)                # MedAssist/
+MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "best_xray_model.pth")
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 CLASS_NAMES = ["NORMAL", "PNEUMONIA"]
 
 # -------------------------

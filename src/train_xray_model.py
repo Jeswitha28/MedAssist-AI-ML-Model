@@ -8,15 +8,22 @@ from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
 # =========================
+# PATH SETUP
+# =========================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))   # src/
+PROJECT_ROOT = os.path.dirname(BASE_DIR)                # MedAssist/
+
+TRAIN_DIR = os.path.join(PROJECT_ROOT, "data", "chest_xray", "train")
+TEST_DIR = os.path.join(PROJECT_ROOT, "data", "chest_xray", "test")
+MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
+MODEL_SAVE_PATH = os.path.join(MODELS_DIR, "best_xray_model.pth")
+
+# =========================
 # CONFIG
 # =========================
-TRAIN_DIR = "data/chest_xray/train"
-TEST_DIR = "data/chest_xray/test"
-MODEL_SAVE_PATH = "models/best_xray_model.pth"
-
-BATCH_SIZE = 8          # reduce to 4 if laptop is slow
+BATCH_SIZE = 8
 IMG_SIZE = 224
-EPOCHS = 5              # increase later to 8-10 if needed
+EPOCHS = 5
 LEARNING_RATE = 1e-4
 VAL_SPLIT = 0.2
 SEED = 42
@@ -33,7 +40,7 @@ if not os.path.exists(TRAIN_DIR):
 if not os.path.exists(TEST_DIR):
     raise FileNotFoundError(f"Test folder not found: {TEST_DIR}")
 
-os.makedirs("models", exist_ok=True)
+os.makedirs(MODELS_DIR, exist_ok=True)
 
 # =========================
 # SET SEED
@@ -63,15 +70,13 @@ eval_transform = transforms.Compose([
 ])
 
 # =========================
-# LOAD FULL TRAIN DATASET
+# LOAD DATASET
 # =========================
 full_train_dataset = datasets.ImageFolder(TRAIN_DIR, transform=train_transform)
-
-# We need separate transform for validation
 full_train_dataset_eval = datasets.ImageFolder(TRAIN_DIR, transform=eval_transform)
 
 class_names = full_train_dataset.classes
-print("Classes:", class_names)   # ['NORMAL', 'PNEUMONIA']
+print("Classes:", class_names)
 
 # =========================
 # TRAIN / VAL SPLIT
@@ -86,11 +91,9 @@ train_indices, val_indices = random_split(
     generator=torch.Generator().manual_seed(SEED)
 )
 
-# Create subsets with different transforms
 train_subset = torch.utils.data.Subset(full_train_dataset, train_indices.indices)
 val_subset = torch.utils.data.Subset(full_train_dataset_eval, val_indices.indices)
 
-# Test dataset
 test_dataset = datasets.ImageFolder(TEST_DIR, transform=eval_transform)
 
 # =========================
@@ -109,18 +112,15 @@ print(f"Testing samples: {len(test_dataset)}")
 # =========================
 model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
 
-# Freeze all pretrained layers
 for param in model.parameters():
     param.requires_grad = False
 
-# Replace final classification layer
 num_features = model.fc.in_features
 model.fc = nn.Sequential(
     nn.Dropout(0.3),
     nn.Linear(num_features, 2)
 )
 
-# Only train final layer
 for param in model.fc.parameters():
     param.requires_grad = True
 
@@ -140,9 +140,6 @@ best_val_acc = 0.0
 for epoch in range(EPOCHS):
     print(f"\n========== Epoch {epoch+1}/{EPOCHS} ==========")
 
-    # -------------------------
-    # TRAIN
-    # -------------------------
     model.train()
     train_loss = 0.0
     train_correct = 0
@@ -165,9 +162,6 @@ for epoch in range(EPOCHS):
     train_loss /= train_total
     train_acc = train_correct / train_total
 
-    # -------------------------
-    # VALIDATION
-    # -------------------------
     model.eval()
     val_loss = 0.0
     val_correct = 0
@@ -191,7 +185,6 @@ for epoch in range(EPOCHS):
     print(f"Train Loss: {train_loss:.4f} | Train Accuracy: {train_acc:.4f}")
     print(f"Val Loss:   {val_loss:.4f} | Val Accuracy:   {val_acc:.4f}")
 
-    # Save best model
     if val_acc > best_val_acc:
         best_val_acc = val_acc
         torch.save(model.state_dict(), MODEL_SAVE_PATH)
@@ -201,7 +194,7 @@ print("\n🎉 Training completed!")
 print(f"Best Validation Accuracy: {best_val_acc:.4f}")
 
 # =========================
-# LOAD BEST MODEL FOR TESTING
+# TEST BEST MODEL
 # =========================
 print("\n========== Testing Best Model ==========")
 

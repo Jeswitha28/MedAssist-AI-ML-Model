@@ -27,25 +27,6 @@ def run_medassist_ai():
         existing_disease = ""
 
     # -------------------------
-    # OPTIONAL MANUAL PRESCRIPTION TEXT
-    # -------------------------
-    use_manual = input("Do you want to enter manual prescription text? (yes/no): ").strip().lower()
-
-    manual_prescription_text = None
-    if use_manual == "yes":
-        print("\nEnter prescription lines one by one.")
-        print("Type DONE when finished:\n")
-
-        lines = []
-        while True:
-            line = input()
-            if line.strip().upper() == "DONE":
-                break
-            lines.append(line)
-
-        manual_prescription_text = "\n".join(lines)
-
-    # -------------------------
     # MODULE 1: X-ray Analysis
     # -------------------------
     xray_result = predict_xray_condition(xray_image_path)
@@ -61,11 +42,10 @@ def run_medassist_ai():
     )
 
     # -------------------------
-    # MODULE 3: Prescription Processing
+    # MODULE 3: Prescription Processing (OCR only)
     # -------------------------
     prescription_result = process_prescription(
         image_path=prescription_image_path,
-        manual_text=manual_prescription_text,
         age=patient_age
     )
 
@@ -123,7 +103,13 @@ def run_medassist_ai():
     if prescription_result["medicines"]:
         print("\n- Medicines Detected:")
         for med in prescription_result["medicines"]:
-            print(f"  * {med['medicine']} | Raw: {med['raw_candidate']} | Source: {med['lookup_source']} | Dose: {med['dosage_mg']} mg | Safe Range: {med['safe_range']}")
+            print(
+                f"  * {med['medicine']} | "
+                f"Raw: {med['raw_candidate']} | "
+                f"Source: {med['lookup_source']} | "
+                f"Dose: {med['dosage_mg']} mg | "
+                f"Safe Range: {med['safe_range']}"
+            )
     else:
         print("\n- Medicines Detected: None reliably detected")
 

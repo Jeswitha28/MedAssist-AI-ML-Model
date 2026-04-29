@@ -1,6 +1,15 @@
+import os
 import pandas as pd
 
-med_db = pd.read_csv("data/medicine_db.csv")
+# =========================
+# PATH SETUP
+# =========================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))   # src/
+PROJECT_ROOT = os.path.dirname(BASE_DIR)                # MedAssist/
+MED_DB_PATH = os.path.join(PROJECT_ROOT, "data", "medicine_db.csv")
+
+# Load medicine database safely
+med_db = pd.read_csv(MED_DB_PATH)
 
 def evaluate_prescription_relevance(xray_condition, detected_medicines):
     if not xray_condition:
@@ -27,11 +36,11 @@ def evaluate_prescription_relevance(xray_condition, detected_medicines):
             relevant = True
             break
 
-    # If X-ray is normal, prescription may still be unrelated / review needed
     if xray_condition == "normal":
         return "NO CLEAR X-RAY-BASED JUSTIFICATION / NEEDS CLINICAL REVIEW"
 
     return "YES" if relevant else "PARTIALLY / NEEDS REVIEW"
+
 
 def generate_final_suggestions(xray_result, risk_result, prescription_result):
     suggestions = []
