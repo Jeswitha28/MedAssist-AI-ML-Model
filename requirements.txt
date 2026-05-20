@@ -4,3 +4,7 @@ easyocr
 opencv-python
 pillow
 requests
+torch
+torchvision
+tqdm
+kaggle
