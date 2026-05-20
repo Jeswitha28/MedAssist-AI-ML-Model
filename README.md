@@ -31,6 +31,7 @@ MedAssist/
 │   ├── drug_lookup.py                # Drug database and API integration
 │   ├── clinical_decision_engine.py   # Clinical decision and recommendation generation
 │   ├── train_xray_model.py           # Model training pipeline
+│   ├── evaluate_xray_model.py        # Model evaluation script
 │   └── download_xray_dataset.py      # Dataset download utility
 ├── models/
 │   └── best_xray_model.pth           # Pre-trained X-ray classification model (PyTorch)
@@ -143,6 +144,8 @@ MedAssist/
 | pillow | Latest | Image library |
 | easyocr | Latest | Optical character recognition |
 | requests | Latest | HTTP library for API calls |
+| tqdm | Latest | Progress bar utility |
+| kaggle | Latest | Kaggle API for dataset download |
 
 ---
 
@@ -247,6 +250,13 @@ Generates clinical recommendations and final assessments.
 - Prescription relevance evaluation
 - Interaction checking
 - Final recommendation generation
+
+### `evaluate_xray_model.py`
+Evaluates the performance of the trained ResNet-18 model on the test dataset.
+
+**Key Metrics:**
+- Correct vs. Total predictions
+- Test Accuracy (%)
 
 ---
 
